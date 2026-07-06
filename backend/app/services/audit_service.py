@@ -1,7 +1,7 @@
 """审计日志服务"""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,7 +62,7 @@ class AuditService:
     async def get_stats(self) -> dict:
         """审计统计"""
         # 最近 24 小时操作数
-        day_ago = datetime.now(timezone.utc)
+        day_ago = datetime.now(timezone.utc) - timedelta(hours=24)
         stmt = select(func.count(AuditLog.id)).where(
             AuditLog.created_at >= day_ago
         )
