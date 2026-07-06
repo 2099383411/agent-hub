@@ -81,6 +81,8 @@ def verify_onboard_token(token: str, stored_token: str | None, expires_at: datet
         return False
     if not hmac.compare_digest(token, stored_token):
         return False
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
     if datetime.now(timezone.utc) > expires_at:
         return False
     return True
