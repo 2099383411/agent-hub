@@ -46,7 +46,8 @@ async def claim_token_post(
     agent = await agent_service.get_agent_by_app_id(result["app_id"])
     if agent:
         agent.app_id = app_id
-        agent.app_secret_hash = app_secret  # 简化
+        from app.utils.security import hash_password
+        agent.app_secret_hash = hash_password(app_secret)
         await db.commit()
         result["app_id"] = app_id
         result["app_secret"] = app_secret
