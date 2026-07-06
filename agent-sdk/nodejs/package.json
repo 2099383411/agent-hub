@@ -1,0 +1,15 @@
+{
+  "name": "agent-hub-sdk",
+  "version": "0.1.0",
+  "description": "Agent Hub Node.js SDK - 智能体中台 Agent 接入库",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "scripts": {
+    "test": "node --test tests/"
+  },
+  "keywords": ["agent-hub", "mcp", "ai-agent"],
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.0"
+  }
+}

@@ -1,0 +1,43 @@
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: agent-hub-backend:latest
+    container_name: agent-hub-backend
+    ports:
+      - "8200:8200"
+    volumes:
+      - hub_skills:/app/skills
+      - hub_data:/app/data
+    environment:
+      - HUB_DATABASE_URL=sqlite+aiosqlite:///app/data/agent_hub.db
+      - HUB_SECRET_KEY=${HUB_SECRET_KEY:-change-me-in-production}
+      - HUB_ADMIN_PASSWORD=${HUB_ADMIN_PASSWORD:-admin123}
+      - HUB_SKILLS_DIR=/app/skills/installed
+      - HUB_DEBUG=false
+      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200/api/v1/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: agent-hub-frontend:latest
+    container_name: agent-hub-frontend
+    ports:
+      - "8201:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  hub_skills:
+  hub_data:
