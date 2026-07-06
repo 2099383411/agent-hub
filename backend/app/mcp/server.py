@@ -8,41 +8,54 @@ from app.database import async_session
 from app.services.skill_service import SkillService
 from app.services.heartbeat_service import HeartbeatService
 from app.services.knowledge_service import KnowledgeService
-from app.services.compliance_service import ComplianceService
+from app.services.agent_service import AgentService
 from app.models.system_config import SystemConfig
 from app.schemas.heartbeat import HeartbeatRequest
 from sqlalchemy import select
 
-mcp_app = FastMCP("agent-hub", port=8200)
+mcp_app = FastMCP("agent-hub")
+
+
+async def _resolve_agent_id(app_id: str) -> str | None:
+    """根据 app_id 解析 agent_id"""
+    if not app_id:
+        return None
+    async with async_session() as db:
+        agent_svc = AgentService(db)
+        agent = await agent_svc.get_agent_by_app_id(app_id)
+        return agent.id if agent else None
 
 
 def get_mcp_tools():
     """注册 MCP tools"""
 
     @mcp_app.tool()
-    async def skills_list(category: str = None, scope: str = None) -> str:
+    async def skills_list(category: str = None, scope: str = None, app_id: str = "") -> str:
         """获取技能列表（Agent 可见的技能）"""
+        agent_id = await _resolve_agent_id(app_id)
         async with async_session() as db:
             service = SkillService(db)
-            skills = await service.list_skills(category=category, scope=scope)
+            skills = await service.list_skills(category=category, scope=scope, agent_id=agent_id)
             return json.dumps({"skills": [s.model_dump() for s in skills], "total": len(skills)}, ensure_ascii=False)
 
     @mcp_app.tool()
-    async def skills_get(name: str) -> str:
+    async def skills_get(name: str, app_id: str = "") -> str:
         """查看单个技能详情"""
+        agent_id = await _resolve_agent_id(app_id)
         async with async_session() as db:
             service = SkillService(db)
-            skill = await service.get_skill_detail(name)
+            skill = await service.get_skill_detail(name, agent_id)
             if not skill:
                 return json.dumps({"error": "skill not found"}, ensure_ascii=False)
             return json.dumps(skill.model_dump(), ensure_ascii=False)
 
     @mcp_app.tool()
-    async def skills_download(name: str) -> str:
+    async def skills_download(name: str, app_id: str = "") -> str:
         """下载技能包（含 SKILL.md 和所有附带文件）"""
+        agent_id = await _resolve_agent_id(app_id)
         async with async_session() as db:
             service = SkillService(db)
-            pkg = await service.download_skill(name)
+            pkg = await service.download_skill(name, agent_id)
             if not pkg:
                 return json.dumps({"error": "skill not found or blocked"}, ensure_ascii=False)
             return json.dumps({
@@ -51,17 +64,25 @@ def get_mcp_tools():
             }, ensure_ascii=False)
 
     @mcp_app.tool()
-    async def agent_heartbeat(data: str) -> str:
-        """Agent 心跳上报"""
+    async def agent_heartbeat(data: str, app_id: str = "") -> str:
+        """Agent 心跳上报（需传 app_id 标识身份）"""
         try:
             req = HeartbeatRequest(**json.loads(data))
         except Exception as e:
-            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+            return json.dumps({"status": "error", "message": f"invalid heartbeat data: {e}"}, ensure_ascii=False)
+
+        if not app_id:
+            return json.dumps({"status": "error", "message": "app_id is required"}, ensure_ascii=False)
 
         async with async_session() as db:
-            # 从上下文获取 app_id（实际通过 SSE 握手验证）
+            # 验证 Agent 身份
+            agent_svc = AgentService(db)
+            agent = await agent_svc.get_agent_by_app_id(app_id)
+            if not agent:
+                return json.dumps({"status": "error", "message": "invalid app_id"}, ensure_ascii=False)
+
             service = HeartbeatService(db)
-            resp = await service.process_heartbeat("", req)
+            resp = await service.process_heartbeat(app_id, req)
             return json.dumps(resp.model_dump(), ensure_ascii=False)
 
     @mcp_app.tool()

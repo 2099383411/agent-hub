@@ -17,7 +17,7 @@ services:
       - HUB_ADMIN_PASSWORD=${HUB_ADMIN_PASSWORD:-admin123}
       - HUB_SKILLS_DIR=/app/skills/installed
       - HUB_DEBUG=false
-      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-}
+      - HUB_PUBLIC_URL=http://192.168.1.180:8200
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8200/api/v1/system/health"]
